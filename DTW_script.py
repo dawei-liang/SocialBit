@@ -25,5 +25,5 @@ mfcc2 = librosa.feature.mfcc(y2, sr2)
 librosa.display.specshow(mfcc2)
 
 dist, cost, acc_cost, path = dtw(mfcc1.T, mfcc2.T, dist=lambda x, y: norm(x - y, ord=1))
-print ('Normalized distance between the two sounds:', dist)
+print ('Normalized distance between the two sounds:', dist) 
 
