@@ -30,7 +30,7 @@ def cluter_on_bic(mfcc_s1, mfcc_s2):
     realmin = np.finfo(np.double).tiny
     det0 = max(np.prod(np.maximum(sigma0,eps)),realmin)
 
-    part1 = mfcc_s1 
+    part1 = mfcc_s1
     part2 = mfcc_s2
 
     sigma1 = np.cov(part1).diagonal()
