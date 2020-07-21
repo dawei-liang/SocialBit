@@ -6,7 +6,7 @@ Created on Tue Apr  7 16:06:20 2020
 """
 
 """
-spkear clustering based on different criterion, with the crowd++ method and NN embedding/MFCCs
+spkear clustering based on different criterion
 """
 
 import audio_utils.audio_io as io
