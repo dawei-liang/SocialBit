@@ -14,26 +14,27 @@ from matplotlib import pyplot as plt
 from sklearn.manifold import TSNE
 import seaborn as sns
 
-from keras.models import Model
-from keras.optimizers import SGD
-from keras.losses import categorical_crossentropy
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.losses import categorical_crossentropy
 
 import audio_utils.audio_io as io
 import check_dirs
 import model_Lukic
 
-audio_path = './recordings/remove_0.2_rms/preliminary/pre_conv_outdoor_trim_remove_rms.wav' # path of the audio clip
-label_path = './recordings/remove_0.2_rms/preliminary/pre_conv_outdoor_trim_remove_rms_label.csv' # path of the csv
-save_csv_dir = './recordings/remove_0.2_rms/conv_outdoor/' # dir to save segments of spectrogram
+target_file = '8_1'
+audio_path = './aaa/fine/%s.wav' % target_file # path of the audio clip
+label_path = './aaa/fine/%s.csv' % target_file # path of the csv
+save_csv_dir = './aaa/spectrogram_1s/%s/' % target_file # dir to save segments of spectrogram
 
 weight_path = './CNN_feat_extractor-epoch_20-val_0.3729.hdf5' # path to load weights
 
 # path and file names to save the computed embedding/mfcc features
-save_embedding_path = './recordings/remove_0.2_rms/preliminary/features/pre_outdoor_embedding'
-save_mfcc_path = './recordings/remove_0.2_rms/preliminary/features/pre_outdoor_mfcc'
+save_embedding_path = './aaa/embedding_1s/'
+save_mfcc_path = './aaa/mfcc_1s/'
 
 embedding_layer = 'L9' # output embedding layer, can be 9, 11, 13
-mfcc = False # whether to plot and save mfcc
+mfcc = True # whether to plot and save mfcc
 
 
 #%%
@@ -124,37 +125,41 @@ for seg_idx in range(n):
         spamwriter = csv.writer(csvfile, delimiter=',')
         spamwriter.writerows(seg)
     csvfile.close()
+if mfcc:
+    mfcc_mean = mfcc_mean.T
 
 #%%    
-# load feat and labels from the csv files
+# load mel-spectrogram and labels from the csv files
 csv_list = [os.path.join(save_csv_dir, item) \
-            for item in os.listdir(save_csv_dir) for x in ['0', '1', '2'] if item.startswith(x)]
+            for item in os.listdir(save_csv_dir) if item.endswith('.csv')]
 # It is noted that the input feat and labels are ordered when being read again
 feat, labels = load_csv(csv_list)
 labels_in_str = []
-for i in range(len(labels)):
-    if labels[i] == '0':
-        labels_in_str.append('transition')
+if mfcc:
+    labels_to_be_converted = mfcc_mean[:, -1]
+else:
+    labels_to_be_converted = labels
+for i in range(len(labels_to_be_converted)):
+    if labels_to_be_converted[i] == '0':
+        labels_in_str.append('irrelevant')
     else:
-        labels_in_str.append('speaker' + labels[i])
+        labels_in_str.append('speaker' + str(labels_to_be_converted[i]))
 feat = np.asarray(feat)
 
 #%%
 # embedding extraction
 sne_feat_to_cnn = np.expand_dims(feat, axis=3)
-model = model_Lukic.model(SHAPE=(128, 100, 1), num_test_speakers = 100)
+model = model_Lukic.model_keras(SHAPE=(128, 100, 1), num_test_speakers = 100)
 model_arch = model.architecture()
 intermediate_layer_model = model_compiler(model_arch, 
                                           load_weight=True, 
                                           weight_path=weight_path, 
                                           embedding_layer=embedding_layer)
 embeddings = intermediate_layer_model.predict(sne_feat_to_cnn)
-if mfcc:
-    mfcc_mean = mfcc_mean.T
 
 #%%
 # feature visualization: compute the t-SNE scores
-tsne = TSNE(n_components=2, random_state=0)
+tsne = TSNE(n_components=3, random_state=0)
 if mfcc:
     tsne_feat = tsne.fit_transform(mfcc_mean)
 else:
@@ -164,23 +169,25 @@ plt.figure(figsize=(8,5))
 sns.scatterplot(
     x=tsne_feat[:,0], y=tsne_feat[:,1],
     hue=labels_in_str,
-    palette=sns.color_palette("hls", 3),
+    palette=sns.color_palette("hls", 4),
     legend="full",
     alpha=0.8)
 
 #%%
 # save embedding and mfcc features
+check_dirs.check_dir(save_embedding_path)
+check_dirs.check_dir(save_mfcc_path)
 if not mfcc:
     labels_to_save = np.asarray(labels).reshape((len(labels), 1))
     embeddings_to_save = np.hstack((embeddings, labels_to_save))
-    with open(save_embedding_path + '.csv', 'w', newline='') as csvfile:   # no gap in lines
+    with open(save_embedding_path + target_file + '.csv', 'w', newline='') as csvfile:   # no gap in lines
         spamwriter = csv.writer(csvfile, delimiter=',')
         spamwriter.writerows(embeddings_to_save)
     csvfile.close()
 else:
     mfcc_to_save = mfcc_mean[:, :-1]
     
-    with open(save_mfcc_path + '.csv', 'w', newline='') as csvfile:   # no gap in lines
+    with open(save_mfcc_path + target_file + '.csv', 'w', newline='') as csvfile:   # no gap in lines
         spamwriter = csv.writer(csvfile, delimiter=',')
         spamwriter.writerows(mfcc_mean)
     csvfile.close()
