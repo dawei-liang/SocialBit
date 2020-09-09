@@ -42,12 +42,13 @@ def get_frames(audio_file, sr_new):
     return frames, rms, rms_mean
 
 #%%
-def save_audio(dirc, seg_list, frame_length, sr_new):
+def save_audio(dirc, seg_list, seg_name, frame_length, sr_new):
     """
     save audio segmented audio files
     args:
         dirc: dir to save the audio
         seg_list: list of audio seg
+        seg_name: list of seg names to be saved
         frame_length: # of samples per frame, used for reconstruction
         sr_new: proposed saving rate
     return:
@@ -57,18 +58,18 @@ def save_audio(dirc, seg_list, frame_length, sr_new):
         keys = list(seg_list.keys())
         print('saving %d / %d segments' %(i+1, len(keys)))
         wav_filtered = framing.reconstruct_time_series(seg_list[keys[i]], hop_length_samples=frame_length)
-        io.write_audio_data(dirc + '%s.wav' %(keys[i]), rate=sr_new, wav_data=wav_filtered)
+        io.write_audio_data(dirc + '%s.wav' %(seg_name[i]), rate=sr_new, wav_data=wav_filtered)
     
 #%%
 '''main'''
 sr_new = 16000
 frame_length = 16000   # 1 sec per frame
 loaded_audio_file_raw = './field_study/pilot_edison/socialbit-et-home-072220.wav'   # raw audio
-dir_save_coarse = './field_study/pilot_edison/coarse/coarse/'   # dir to save coarse segs
+dir_save_coarse = './field_study/pilot_edison/coarse/temp/'   # dir to save coarse segs
 dir_loaded_audio_coarse = dir_save_coarse
 valid_list = [8]   # coarse segs used for fine filtering
-dir_save_fine = './field_study/pilot_edison/fine/'   # dir to save fine segs
-mode = 'fine'
+dir_save_fine = './field_study/pilot_edison/fine/temp/'   # dir to save fine segs
+mode = 'coarse'
 rms_thres_coarse, rms_thres_fine = 0.6, 0.2   # energy threshold for noise removal
 t_thres_coarse, t_thres_fine = 60, 20   # max gaps between segs
 
@@ -78,11 +79,15 @@ if mode == 'coarse':
     rms_limit_coarse = rms_thres_coarse * rms_mean   
     t_gap = 0
     seg_list = []   # list of kept segs
+    seg_idx = []   # list of the segment indices
+    seg_name = []
     for i, e in enumerate(rms):
         # if over rms threshold, keep the frame
         if e >= rms_limit_coarse:
             print('%d / %d of total audio has been filtered' %(i, len(rms)))
             frames_filtered = np.vstack((frames_filtered, frames[i,:]))
+            # mark the current idx
+            seg_idx.append(i)
             t_gap = 0
         else:
             t_gap += 1
@@ -90,10 +95,12 @@ if mode == 'coarse':
         if t_gap == t_thres_coarse:
             print('filtered segment shape:', frames_filtered.shape) 
             seg_list.append(frames_filtered)
+            seg_name.append(str(min(seg_idx)) + '-' + str(max(seg_idx)))
             frames_filtered = np.empty((0, frame_length))
+            seg_idx = []
     # save segs
     check_dirs.check_dir(dir_save_coarse)
-    save_audio(dir_save_coarse, seg_list, frame_length, sr_new)
+    save_audio(dir_save_coarse, seg_list, seg_name, frame_length, sr_new)
  
 elif mode == 'fine':
     valid_file_list = [x for y in valid_list for x in os.listdir(dir_loaded_audio_coarse) if x=='%d.wav' %y]
@@ -111,3 +118,4 @@ elif mode == 'fine':
     # save segs
     check_dirs.check_dir(dir_save_fine)
     save_audio(dir_save_fine, seg_list, frame_length, sr_new)
+    
