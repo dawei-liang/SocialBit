@@ -42,13 +42,12 @@ def get_frames(audio_file, sr_new):
     return frames, rms, rms_mean
 
 #%%
-def save_audio(dirc, seg_list, seg_name, frame_length, sr_new):
+def save_audio(dirc, seg_list, frame_length, sr_new):
     """
     save audio segmented audio files
     args:
         dirc: dir to save the audio
-        seg_list: list of audio seg
-        seg_name: list of seg names to be saved
+        seg_list: hash of audio seg
         frame_length: # of samples per frame, used for reconstruction
         sr_new: proposed saving rate
     return:
@@ -58,7 +57,7 @@ def save_audio(dirc, seg_list, seg_name, frame_length, sr_new):
         keys = list(seg_list.keys())
         print('saving %d / %d segments' %(i+1, len(keys)))
         wav_filtered = framing.reconstruct_time_series(seg_list[keys[i]], hop_length_samples=frame_length)
-        io.write_audio_data(dirc + '%s.wav' %(seg_name[i]), rate=sr_new, wav_data=wav_filtered)
+        io.write_audio_data(dirc + '%s.wav' %(keys[i]), rate=sr_new, wav_data=wav_filtered)
     
 #%%
 '''main'''
@@ -78,33 +77,34 @@ if mode == 'coarse':
     frames_filtered = np.empty((0, frame_length))
     rms_limit_coarse = rms_thres_coarse * rms_mean   
     t_gap = 0
-    seg_list = []   # list of kept segs
-    seg_idx = []   # list of the segment indices
-    seg_name = []
+    seg_list = {}   # list of kept segs
+    intra_seg_idx = []   # list of the segment indices
     for i, e in enumerate(rms):
         # if over rms threshold, keep the frame
         if e >= rms_limit_coarse:
             print('%d / %d of total audio has been filtered' %(i, len(rms)))
             frames_filtered = np.vstack((frames_filtered, frames[i,:]))
             # mark the current idx
-            seg_idx.append(i)
+            intra_seg_idx.append(i)
             t_gap = 0
         else:
             t_gap += 1
         # if over temporal threshold, cut a segment
         if t_gap == t_thres_coarse:
-            print('filtered segment shape:', frames_filtered.shape) 
-            seg_list.append(frames_filtered)
-            seg_name.append(str(min(seg_idx)) + '-' + str(max(seg_idx)))
+            print('filtered segment shape:', frames_filtered.shape)
+            seg_name = str(min(intra_seg_idx)) + '-' + str(max(intra_seg_idx))
+            seg_list[seg_name] = frames_filtered           
             frames_filtered = np.empty((0, frame_length))
-            seg_idx = []
+            intra_seg_idx = []
     # save segs
     check_dirs.check_dir(dir_save_coarse)
-    save_audio(dir_save_coarse, seg_list, seg_name, frame_length, sr_new)
+    save_audio(dir_save_coarse, seg_list, frame_length, sr_new)
  
 elif mode == 'fine':
-    valid_file_list = [x for y in valid_list for x in os.listdir(dir_loaded_audio_coarse) if x=='%d.wav' %y]
+    valid_file_list = [x for y in valid_list for x in os.listdir(dir_loaded_audio_coarse) if x=='%s.wav' %y]
     seg_list = {}
+    intra_seg_idx = []   # list of the segment indices
+    seg_name = []
     for item in valid_file_list:
         path = dir_loaded_audio_coarse + item
         frames_filtered = np.empty((0, frame_length))
@@ -113,7 +113,11 @@ elif mode == 'fine':
         for i, e in enumerate(rms):
             if e >= rms_limit_fine:
                 frames_filtered = np.vstack((frames_filtered, frames[i,:]))
-            seg_list[item.strip('.wav')] = frames_filtered
+                intra_seg_idx.append(i)
+            off_set = int(item.split('-')[0])   # offset time points of the current segment
+            seg_name = str(off_set + min(intra_seg_idx)) + '-' + str(off_set + max(intra_seg_idx))
+            seg_list[seg_name] = frames_filtered
+        intra_seg_idx = []
     
     # save segs
     check_dirs.check_dir(dir_save_fine)
