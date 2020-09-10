@@ -74,10 +74,10 @@ t_thres_coarse, t_thres_fine = 60, 20   # max gaps between segs
 
 if mode == 'coarse':
     frames, rms, rms_mean = get_frames(loaded_audio_file_raw, sr_new)
-    frames_filtered = np.empty((0, frame_length))
+    frames_filtered, frame_noise = np.empty((0, frame_length)), np.empty((0, frame_length))
     rms_limit_coarse = rms_thres_coarse * rms_mean   
     t_gap = 0
-    seg_list = {}   # list of kept segs
+    seg_list, noise = {}, {}   # list of kept/noise segs
     intra_seg_idx = []   # list of the segment indices
     for i, e in enumerate(rms):
         # if over rms threshold, keep the frame
@@ -88,6 +88,7 @@ if mode == 'coarse':
             intra_seg_idx.append(i)
             t_gap = 0
         else:
+            frame_noise = np.vstack((frame_noise, frames[i,:]))
             t_gap += 1
         # if over temporal threshold, cut a segment
         if t_gap == t_thres_coarse:
@@ -99,12 +100,16 @@ if mode == 'coarse':
     # save segs
     check_dirs.check_dir(dir_save_coarse)
     save_audio(dir_save_coarse, seg_list, frame_length, sr_new)
+    # save noise
+    noise['noise_coarse'] = frame_noise
+    save_audio(dir_save_coarse, noise, frame_length, sr_new)
  
 elif mode == 'fine':
     valid_file_list = [x for y in valid_list for x in os.listdir(dir_loaded_audio_coarse) if x=='%s.wav' %y]
-    seg_list = {}
+    seg_list, noise = {}, {}
     intra_seg_idx = []   # list of the segment indices
     seg_name = []
+    frame_noise = np.empty((0, frame_length))
     for item in valid_file_list:
         path = dir_loaded_audio_coarse + item
         frames_filtered = np.empty((0, frame_length))
@@ -114,10 +119,15 @@ elif mode == 'fine':
             if e >= rms_limit_fine:
                 frames_filtered = np.vstack((frames_filtered, frames[i,:]))
                 intra_seg_idx.append(i)
+            else:
+                frame_noise = np.vstack((frame_noise, frames[i,:]))
             off_set = int(item.split('-')[0])   # offset time points of the current segment
             seg_name = str(off_set + min(intra_seg_idx)) + '-' + str(off_set + max(intra_seg_idx))
             seg_list[seg_name] = frames_filtered
         intra_seg_idx = []
+    # save noise
+    noise['noise_fine'] = frame_noise
+    save_audio(dir_save_coarse, noise, frame_length, sr_new)
     
     # save segs
     check_dirs.check_dir(dir_save_fine)
