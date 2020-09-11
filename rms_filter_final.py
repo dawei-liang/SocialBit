@@ -66,7 +66,7 @@ frame_length = 16000   # 1 sec per frame
 loaded_audio_file_raw = './field_study/pilot_edison/socialbit-et-home-072220.wav'   # raw audio
 dir_save_coarse = './field_study/pilot_edison/coarse/temp/'   # dir to save coarse segs
 dir_loaded_audio_coarse = dir_save_coarse
-valid_list = ['3000-5000']   # coarse segs used for fine filtering
+valid_list = ['10863-11667']   # coarse segs used for fine filtering
 dir_save_fine = './field_study/pilot_edison/fine/temp/'   # dir to save fine segs
 mode = 'fine'
 rms_thres_coarse, rms_thres_fine = 0.6, 0.2   # energy threshold for noise removal
@@ -74,10 +74,10 @@ t_thres_coarse = 60   # max gaps between segs
 
 if mode == 'coarse':
     frames, rms, rms_mean = get_frames(loaded_audio_file_raw, sr_new)
-    frames_filtered, frame_noise = np.empty((0, frame_length)), np.empty((0, frame_length))
+    frames_filtered = np.empty((0, frame_length))
     rms_limit_coarse = rms_thres_coarse * rms_mean   
     t_gap = 0
-    seg_list, noise = {}, {}   # list of kept/noise segs
+    seg_list = {}   # list of kept/noise segs
     intra_seg_idx = []   # list of the segment indices
     for i, e in enumerate(rms):
         # if over rms threshold, keep the frame
@@ -88,7 +88,6 @@ if mode == 'coarse':
             intra_seg_idx.append(i)
             t_gap = 0
         else:
-            frame_noise = np.vstack((frame_noise, frames[i,:]))
             t_gap += 1
         # if over temporal threshold, cut a segment
         if t_gap == t_thres_coarse:
@@ -100,22 +99,22 @@ if mode == 'coarse':
     # save segs
     check_dirs.check_dir(dir_save_coarse)
     save_audio(dir_save_coarse, seg_list, frame_length, sr_new)
-    # save noise
-    noise['noise_coarse'] = frame_noise
-    save_audio(dir_save_coarse, noise, frame_length, sr_new)
  
 elif mode == 'fine':
     valid_file_list = [x for y in valid_list for x in os.listdir(dir_loaded_audio_coarse) if x=='%s.wav' %y]
     noise = {}
     frames, rms, rms_mean = get_frames(loaded_audio_file_raw, sr_new)
+    frame_noise = np.empty((0, frame_length))
     for item in valid_file_list:
         # obtain onset and offset time points of the current segment
-        onset, offset = int(item.split('-')[0]), int(item.split('-')[1])   
-        frames[onset:offset, :] = -1
-    frame_noise = frames.remove(-1)
+        onset, offset = int(item.split('-')[0]), int(item.split('-')[1].strip('.wav'))   
+        frames[onset:offset, 0] = np.inf
+    for noise_idx in range(len(frames)):
+        if frames[noise_idx, 0] != np.inf:
+            print('%d / %d of total audio has been checked' %(noise_idx, len(frames)))
+            frame_noise = np.vstack((frame_noise, frames[noise_idx, :]))
     # save noise
-    noise['noise_filtered'] = frame_noise
+    noise['noise'] = frame_noise
     check_dirs.check_dir(dir_save_fine)
     save_audio(dir_save_fine, noise, frame_length, sr_new)
-    
     
