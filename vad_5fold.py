@@ -194,10 +194,10 @@ if predict:
               pred[idx_n] = 2
           elif mode == '3class':
               pass
-          f1_per_fold.append(f1_score(labels_test, pred, average = 'weighted') * 100)
           acc_per_fold.append(balanced_accuracy_score(labels_test, pred) * 100)
-          pre_per_fold.append(precision_score(labels_test, pred, average = 'weighted') * 100)
-          rec_per_fold.append(recall_score(labels_test, pred, average = 'weighted') * 100)  
+          f1_per_fold.append(f1_score(labels_test, pred, average = 'macro') * 100)
+          pre_per_fold.append(precision_score(labels_test, pred, average = 'macro') * 100)
+          rec_per_fold.append(recall_score(labels_test, pred, average = 'macro') * 100)  
           # initialize
           del model_pred
           fold_no = fold_no + 1
