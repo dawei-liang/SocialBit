@@ -81,7 +81,7 @@ class model_3class():
 """
 main func
 """
-feature = 'mfcc'
+feature = 'mfcc'   # embedding or mfcc
 mode = '3class'
 
 sound_dir = './field_study/field_data/p0/mfcc_1s/120MFCC/'
@@ -95,7 +95,7 @@ sound_data = np.concatenate(sound_data, axis = 0)
 if feature == 'embedding':
     feat_size = 1000
 elif feature == 'mfcc':
-    feat_size = 120
+    feat_size = 12
 features, labels = sound_data[:, :feat_size], sound_data[:, -1]
 # remove invalid test sounds
 idx_valid_voice = np.where(labels != 'm')
