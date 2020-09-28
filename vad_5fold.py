@@ -172,7 +172,7 @@ if not predict:
 # validation                     
 if predict:
       models = [os.path.join(save_model_path, item) \
-                for item in os.listdir(save_model_path) if item.endswith('.h5')]
+                for item in sorted(os.listdir(save_model_path)) if item.endswith('.h5')]
       for train, test in kfold.split(features, labels):
           feat_train, labels_train = features[train], labels[train]
           feat_test, labels_test = features[test], labels[test]
@@ -196,8 +196,8 @@ if predict:
               pass
           f1_per_fold.append(f1_score(labels_test, pred, average = 'weighted') * 100)
           acc_per_fold.append(balanced_accuracy_score(labels_test, pred) * 100)
-          pre_per_fold.append(precision_score(labels_test, pred, average = 'weighted'))
-          rec_per_fold.append(recall_score(labels_test, pred, average = 'weighted'))  
+          pre_per_fold.append(precision_score(labels_test, pred, average = 'weighted') * 100)
+          rec_per_fold.append(recall_score(labels_test, pred, average = 'weighted') * 100)  
           # initialize
           del model_pred
           fold_no = fold_no + 1
