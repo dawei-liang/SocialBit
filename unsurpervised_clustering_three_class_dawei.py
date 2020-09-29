@@ -14,6 +14,43 @@ import seaborn as sn
 import itertools
 
 #%%
+class distance_based_classifier_two_class():
+
+    def __init__(self, distance_metric = 'cosine_similarity', threshold = 0.7):
+        self.distance_metric = distance_metric
+        self.threshold = threshold
+
+    def fit(self, vecs):
+        '''Take the average of all the wearer speech vector as characteristic vector
+        args:
+            vecs -- [np.ndarray] numpy array in shape (num_vector, len_vector)
+        '''
+        self.chara_vec = np.sum(vecs, axis = 0)/vecs.shape[0]
+
+    def predict(self, vecs, threshold = None):
+
+        if self.distance_metric == 'cosine_similarity':
+            dis = cosine_similarity(vecs, np.expand_dims(self.chara_vec, 0)).reshape(-1)
+        else:
+            raise KeyError('distance metric: %s does not exist' %(self.distance_metric))
+
+        pred_labels = np.ones(len(dis))
+        if not threshold:
+            idx_os_ns =  np.where(dis <= self.threshold)
+            pred_labels[idx_os_ns] = 2
+            return pred_labels
+        else:
+            idx_os_ns =  np.where(dis <= threshold)
+            pred_labels[idx_os_ns] = 2
+            return pred_labels
+    def compute_distance(self, vecs):
+
+        if self.distance_metric == 'cosine_similarity':
+            dis = cosine_similarity(vecs, np.expand_dims(self.chara_vec, 0)).reshape(-1)
+        else:
+            raise KeyError('distance metric: %s does not exist' %(self.distance_metric))
+
+        return dis
 
 class distance_based_classifier_three_class():
     """
@@ -70,7 +107,7 @@ def load_features(feat_path, feat_type):
         feat_size = 1000
     else:
         feat_size = 12
-    a = pd.read_csv(feat_path, delimiter=',').values
+    a = pd.read_csv(feat_path, delimiter=',', header=None).values
 
     return a[:, :feat_size], a[:, -1]
 
@@ -84,7 +121,7 @@ def load_multiple_features(feat_path, feat_type):
         feat_size = 12
     f = []
     for fp in feat_path:
-        a = pd.read_csv(fp, delimiter=',').values
+        a = pd.read_csv(fp, delimiter=',', header=None).values
         f.append(a)
     f = np.concatenate(f, axis = 0)
 
@@ -128,29 +165,83 @@ def plot_confusion_matrix(cm, classes,
 
 distsance_metric = 'cosine_similarity'
 feat_type = 'embedding'   # use embedding or mfcc
+classes = 2   # 2 or 3
 
-
-if feat_type == 'embedding':
-    threshold = [0.33, 0.278]
-elif feat_type == 'mfcc':
-    threshold = [0.996891, 0.994805]
 
 train_feat_path = './field_study/field_data/p0/%s_1s/reading.csv' %feat_type   # ref voice
 test_feat_path = ['./field_study/field_data/p0/%s_1s/call.csv' %feat_type,
                  './field_study/field_data/p0/%s_1s/dinner.csv' %feat_type,
-                 './field_study/field_data/p0/%s_1s/game.csv' %feat_type]   # test voice  
+                 './field_study/field_data/p0/%s_1s/game.csv' %feat_type,
+                 './field_study/field_data/p0/%s_1s/outdoor.csv' %feat_type,
+                 './field_study/field_data/p0/%s_1s/noise.csv' %feat_type]   # test voice  
 train_embedding, train_labels = load_features(train_feat_path, feat_type = feat_type)
 test_embedding, test_labels = load_multiple_features(test_feat_path, feat_type = feat_type)
 
-# select reference (training) voice
-train_idx_ws = np.where(train_labels == '1')
-train_labels[train_idx_ws] = 1
-train_vec_ws = train_embedding[train_idx_ws]
-
+# remove invalid training sounds
+idx_valid_voice = np.where(train_labels == '1')
+train_labels_filtered = train_labels[idx_valid_voice]
+train_vec_ws = train_embedding[idx_valid_voice]
 # remove invalid test sounds
 idx_valid_voice = np.where(test_labels != 'm')
 test_labels_filtered = test_labels[idx_valid_voice]
 test_embedding_filtered = test_embedding[idx_valid_voice]
+#%%
+# plot distributions of the embedding values 
+# select embedding for each class
+idx_1 = np.where(test_labels_filtered == '1')
+embedding_1 = test_embedding_filtered[idx_1]
+embedding_1_mean = np.mean(embedding_1, axis=0).astype(float)
+embedding_1_max = np.max(embedding_1, axis=0).astype(float)
+
+idx_2 = np.where(test_labels_filtered == '2')
+embedding_2 = test_embedding_filtered[idx_2]
+idx_p = np.where(test_labels_filtered == 'p')
+embedding_p = test_embedding_filtered[idx_p]
+idx_t = np.where(test_labels_filtered == 't')
+embedding_t = test_embedding_filtered[idx_t]
+embedding_2_p = np.vstack((embedding_2, embedding_p))
+embedding_2_p_t = np.vstack((embedding_2_p, embedding_t))
+embedding_2_p_t_mean = np.mean(embedding_2_p_t, axis=0).astype(float)
+embedding_2_p_t_max = np.max(embedding_2_p_t, axis=0).astype(float)
+
+idx_b = np.where(test_labels_filtered == 'b')
+embedding_b = test_embedding_filtered[idx_b]
+idx_n = np.where(test_labels_filtered == 0)
+embedding_n = test_embedding_filtered[idx_n]
+embedding_b_n = np.vstack((embedding_b, embedding_n))
+embedding_b_n_mean = np.mean(embedding_b_n, axis=0).astype(float)
+embedding_b_n_max = np.mean(embedding_b_n, axis=0).astype(float)
+
+plt.figure(1)
+plt.hist(embedding_1_mean, bins=50, range=(0,1), density=True)
+plt.xlabel('Embedding values')
+plt.ylabel('Density')
+plt.show()
+
+plt.figure(2)
+plt.hist(embedding_2_p_t_mean, bins=50, range=(0,1), density=True)
+plt.xlabel('Embedding values')
+plt.ylabel('Density')
+plt.show()
+
+plt.figure(3)
+plt.hist(embedding_b_n_mean, bins=50, range=(0,1), density=True)
+plt.xlabel('Embedding values')
+plt.ylabel('Density')
+plt.show()
+
+plt.figure(4)
+plt.hist([embedding_1_max, embedding_2_p_t_max, embedding_b_n_max], bins=50, range=(0,7), density=True)
+plt.legend(["Wearer", "Other voice", "Background"])
+plt.xlabel('Max embedding values')
+plt.ylabel('Density')
+plt.show()
+
+#%%
+# Change training sound labels to a consistent format
+for i in range(len(train_labels_filtered)):
+    train_labels_filtered[i] = 1 
+train_labels_filtered = train_labels_filtered.astype(int)
 # Change test sound labels to a consistent format
 idx_wearer_voice = np.where(test_labels_filtered == '1')   # wearer
 test_labels_filtered[idx_wearer_voice] = 1
@@ -161,27 +252,54 @@ test_labels_filtered[idx_other_voice] = 2
 idx_other_voice = np.where(test_labels_filtered == 't')
 test_labels_filtered[idx_other_voice] = 2
 idx_noise = np.where(test_labels_filtered == 'b')   # non-vocal background
-test_labels_filtered[idx_noise] = 0
-true_labels = test_labels_filtered.copy().astype(int)
+idx_noise_old = np.where(test_labels_filtered == 0)   # old labels of noise
+if classes == 3:
+    test_labels_filtered[idx_noise] = 0
+elif classes == 2:
+    test_labels_filtered[idx_noise] = 2
+    test_labels_filtered[idx_noise_old] = 2
+test_labels_filtered = test_labels_filtered.astype(int)   
 
 #%%
+if feat_type == 'embedding':
+    if classes == 2:
+        threshold = 0.311
+    elif classes == 3:
+        threshold = [0.3221, 0.2905]
+elif feat_type == 'mfcc':
+    threshold = [0.99743, 0.99380]
+    
 # fit and predict
-clf = distance_based_classifier_three_class(distance_metric = 'cosine_similarity', threshold = threshold)
+if classes == 2:  
+    clf = distance_based_classifier_two_class(distance_metric = 'cosine_similarity', 
+                                                threshold = threshold)   
+elif classes == 3:
+    clf = distance_based_classifier_three_class(distance_metric = 'cosine_similarity', 
+                                                threshold = threshold)
 clf.fit(train_vec_ws)
 pred_labels = clf.predict(test_embedding_filtered)
+acc = balanced_accuracy_score(test_labels_filtered, pred_labels)
+f1 = f1_score(test_labels_filtered, pred_labels, average = 'macro')
 
 # print classification result
-print('Using threshold %.4f, %.4f: balanced accuracy %f weighted f1 %f' %(threshold[0], threshold[1], 
-                                                                          balanced_accuracy_score(true_labels, pred_labels),
-                                                                          f1_score(true_labels, pred_labels, average = 'weighted')))
-plt.figure(1, figsize = (6,4))
-a = confusion_matrix(true_labels, pred_labels)
-#df_cm = pd.DataFrame(a, index = ,
-#                        columns = ["background", "wearer", "other voice"])
-#sn.heatmap(df_cm, annot=True, cmap = plt.cm.Blues)
-plot_confusion_matrix(a, classes=["background", "wearer", "other voice"], normalize=True,
-                      title='Classification Results')
-plt.title('confusion matrix (threshold %.3f, %.3f)' %(threshold[0], threshold[1]))
+if classes == 2:
+    print('Using threshold %.4f: balanced accuracy %f macro f1 %f' %(threshold,  
+                                                                        acc, f1))
+elif classes == 3:
+    print('Using threshold %.4f, %.4f: balanced accuracy %f macro f1 %f' %(threshold[0], 
+                                                                              threshold[1], 
+                                                                              acc, f1))
+plt.figure(5, figsize = (6,4))
+a = confusion_matrix(test_labels_filtered, pred_labels)
+
+if classes == 2:
+    plot_confusion_matrix(a, classes=["Back + Other voice", "Wearer"], normalize=True,
+                          title='Classification Results')
+    plt.title('Confusion matrix, 2-Class (threshold %.3f)' %(threshold))
+elif classes == 3:
+    plot_confusion_matrix(a, classes=["Background", "Wearer", "Other voice"], normalize=True,
+                          title='Classification Results')
+    plt.title('Confusion matrix, 3-Class (thresholds %.3f, %.3f)' %(threshold[0], threshold[1]))
 plt.show()
 
 # Plot class-wise feature distributions
@@ -195,11 +313,20 @@ vec_ns = test_embedding_filtered[idx_ns]
 
 dis_ws = clf.compute_distance(vec_ws)
 dis_os = clf.compute_distance(vec_os)
-dis_ns = clf.compute_distance(vec_ns)
+if classes == 3:
+    dis_ns = clf.compute_distance(vec_ns)
 
-plt.figure(2)
-plt.hist([dis_ws, dis_os,dis_ns], density  = True)
-plt.legend(["wearer", "other voice", "background"])
-plt.xlabel('cosine similarity')
-plt.ylabel('density')
-plt.show()
+
+plt.figure(6)
+if classes == 2:
+    plt.hist([dis_ws, dis_os], bins=50, density  = True)
+    plt.legend(["Wearer", "Background + Other voice"])
+    plt.xlabel('Cosine similarity')
+    plt.ylabel('Density')
+    plt.show()
+elif classes == 3:
+    plt.hist([dis_ws, dis_os,dis_ns], bins=50, density  = True)
+    plt.legend(["Wearer", "Other voice", "Background"])
+    plt.xlabel('Cosine similarity')
+    plt.ylabel('Density')
+    plt.show()   
