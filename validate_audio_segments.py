@@ -11,10 +11,10 @@ import numpy as np
 import audio_utils.audio_io as io
 import check_dirs
 
-target_file = 'call'
-audio_path = './field_study/field_data/p0/segments/%s.wav' % target_file # path of the audio clip
-label_path = './field_study/field_data/p0/labels/%s.csv' % target_file # path of the csv
-save_validation_audio = './field_study/field_data/p0/validation_audio/'
+target_file = 'outdoor'
+audio_path = './field_study/field_data/p0/segments/%s.wav' % target_file # path to load the audio clip
+label_path = './field_study/field_data/p0/labels/%s.csv' % target_file # path to load the csv labels
+save_validation_audio = './field_study/field_data/p0/validation_audio/%s/' % target_file # path to save your segmentation
 
 #%%
 # Load wav data
