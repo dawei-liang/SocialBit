@@ -150,7 +150,7 @@ if feature != 'contextual':
     if feature == 'embedding':
         feat_size = 1000
     elif feature == 'mfcc':
-        feat_size = 46
+        feat_size = 46   # original 48D, we did not use f0 and delta f0 as they do not help
     features, labels = sound_data[:, :feat_size], sound_data[:, -1]
 
 # obtain features and labels for contextual mfcc features (2D)
