@@ -57,9 +57,10 @@ class distance_based_classifier_three_class():
     Classification by using cosine distance metric
     """
     
-    def __init__(self, distance_metric = 'cosine_similarity', threshold = [0.25, 0.2]):
+    def __init__(self, distance_metric = 'cosine_similarity', threshold = [0.25, 0.2], feat_type = None):
         self.distance_metric = distance_metric
         self.threshold = threshold
+        self.feat_type = feat_type
 
     def fit(self, vecs):
         self.chara_vec = np.sum(vecs, axis = 0)/vecs.shape[0]
@@ -73,16 +74,31 @@ class distance_based_classifier_three_class():
 
         pred_labels = np.zeros(len(dis))
         if not threshold:
-            idx_ws =  np.where(dis > self.threshold[0])
-            idx_os =  np.where(dis < self.threshold[1])
-            pred_labels[idx_ws] = 1
-            pred_labels[idx_os] = 2
+            if feat_type == 'embedding':
+                idx_ws =  np.where(dis > self.threshold[0])
+                idx_os =  np.where(dis < self.threshold[1])
+                pred_labels[idx_ws] = 1
+                pred_labels[idx_os] = 2
+            elif feat_type == 'mfcc':
+                # the initial array for mfcc is [2,...,2]
+                pred_labels = pred_labels + 2
+                idx_ws =  np.where(dis > self.threshold[0])
+                idx_b =  np.where(dis < self.threshold[1])
+                pred_labels[idx_ws] = 1
+                pred_labels[idx_b] = 0
             return pred_labels
         else:
-            idx_ws =  np.where(dis > threshold[0])
-            idx_os =  np.where(dis < threshold[1])
-            pred_labels[idx_ws] = 1
-            pred_labels[idx_os] = 2
+            if feat_type == 'embedding':
+                idx_ws =  np.where(dis > threshold[0])
+                idx_os =  np.where(dis < threshold[1])
+                pred_labels[idx_ws] = 1
+                pred_labels[idx_os] = 2
+            elif feat_type == 'mfcc':
+                pred_labels = pred_labels + 2
+                idx_ws =  np.where(dis > self.threshold[0])
+                idx_os =  np.where(dis < self.threshold[1])
+                pred_labels[idx_ws] = 1
+                pred_labels[idx_b] = 0
             return pred_labels
     def compute_distance(self, vecs):
 
@@ -106,7 +122,7 @@ def load_features(feat_path, feat_type):
     if feat_type == 'embedding':
         feat_size = 1000
     else:
-        feat_size = 12
+        feat_size = 46   # original 48D, we did not use f0 and delta f0 as they do not help
     a = pd.read_csv(feat_path, delimiter=',', header=None).values
 
     return a[:, :feat_size], a[:, -1]
@@ -118,7 +134,7 @@ def load_multiple_features(feat_path, feat_type):
     if feat_type == 'embedding':
         feat_size = 1000
     else:
-        feat_size = 12
+        feat_size = 46
     f = []
     for fp in feat_path:
         a = pd.read_csv(fp, delimiter=',', header=None).values
@@ -168,12 +184,12 @@ feat_type = 'embedding'   # use embedding or mfcc
 classes = 2   # 2 or 3
 
 
-train_feat_path = './field_study/field_data/p0/%s_1s/reading.csv' %feat_type   # ref voice
-test_feat_path = ['./field_study/field_data/p0/%s_1s/call.csv' %feat_type,
-                 './field_study/field_data/p0/%s_1s/dinner.csv' %feat_type,
-                 './field_study/field_data/p0/%s_1s/game.csv' %feat_type,
-                 './field_study/field_data/p0/%s_1s/outdoor.csv' %feat_type,
-                 './field_study/field_data/p0/%s_1s/noise.csv' %feat_type]   # test voice  
+train_feat_path = './field_study/field_data/P2/%s_1s/reading.csv' %feat_type   # ref voice
+test_feat_path = ['./field_study/field_data/P2/%s_1s/call.csv' %feat_type,
+                 './field_study/field_data/P2/%s_1s/dinner.csv' %feat_type,
+                 './field_study/field_data/P2/%s_1s/game.csv' %feat_type,
+                 './field_study/field_data/P2/%s_1s/outdoor.csv' %feat_type,
+                 './field_study/field_data/P2/%s_1s/TV.csv' %feat_type]   # test voice  
 train_embedding, train_labels = load_features(train_feat_path, feat_type = feat_type)
 test_embedding, test_labels = load_multiple_features(test_feat_path, feat_type = feat_type)
 
@@ -182,9 +198,12 @@ idx_valid_voice = np.where(train_labels == '1')
 train_labels_filtered = train_labels[idx_valid_voice]
 train_vec_ws = train_embedding[idx_valid_voice]
 # remove invalid test sounds
-idx_valid_voice = np.where(test_labels != 'm')
+idx_valid_voice_m = np.where(test_labels != 'm')
+idx_valid_voice_x = np.where(test_labels != 'x')
+idx_valid_voice = np.intersect1d(idx_valid_voice_m, idx_valid_voice_x)
 test_labels_filtered = test_labels[idx_valid_voice]
 test_embedding_filtered = test_embedding[idx_valid_voice]
+
 #%%
 # plot distributions of the embedding values 
 # select embedding for each class
@@ -195,14 +214,16 @@ embedding_1_max = np.max(embedding_1, axis=0).astype(float)
 
 idx_2 = np.where(test_labels_filtered == '2')
 embedding_2 = test_embedding_filtered[idx_2]
+embedding_2_mean = np.mean(embedding_2, axis=0).astype(float)
+embedding_2_max = np.max(embedding_2, axis=0).astype(float)
+
 idx_p = np.where(test_labels_filtered == 'p')
 embedding_p = test_embedding_filtered[idx_p]
 idx_t = np.where(test_labels_filtered == 't')
 embedding_t = test_embedding_filtered[idx_t]
-embedding_2_p = np.vstack((embedding_2, embedding_p))
-embedding_2_p_t = np.vstack((embedding_2_p, embedding_t))
-embedding_2_p_t_mean = np.mean(embedding_2_p_t, axis=0).astype(float)
-embedding_2_p_t_max = np.max(embedding_2_p_t, axis=0).astype(float)
+embedding_p_t = np.vstack((embedding_p, embedding_t))
+embedding_p_t_mean = np.mean(embedding_p_t, axis=0).astype(float)
+embedding_p_t_max = np.max(embedding_p_t, axis=0).astype(float)
 
 idx_b = np.where(test_labels_filtered == 'b')
 embedding_b = test_embedding_filtered[idx_b]
@@ -216,23 +237,33 @@ plt.figure(1)
 plt.hist(embedding_1_mean, bins=50, range=(0,1), density=True)
 plt.xlabel('Embedding values')
 plt.ylabel('Density')
+plt.title('Wearer')
 plt.show()
 
 plt.figure(2)
-plt.hist(embedding_2_p_t_mean, bins=50, range=(0,1), density=True)
+plt.hist(embedding_2_mean, bins=50, range=(0,1), density=True)
 plt.xlabel('Embedding values')
 plt.ylabel('Density')
+plt.title('Non-wearer (Human)')
 plt.show()
 
 plt.figure(3)
-plt.hist(embedding_b_n_mean, bins=50, range=(0,1), density=True)
+plt.hist(embedding_p_t_mean, bins=50, range=(0,1), density=True)
 plt.xlabel('Embedding values')
 plt.ylabel('Density')
+plt.title('Non-wearer (Virtual)')
 plt.show()
 
 plt.figure(4)
-plt.hist([embedding_1_max, embedding_2_p_t_max, embedding_b_n_max], bins=50, range=(0,7), density=True)
-plt.legend(["Wearer", "Other voice", "Background"])
+plt.hist(embedding_b_n_mean, bins=50, range=(0,1), density=True)
+plt.xlabel('Embedding values')
+plt.title('Background')
+plt.ylabel('Density')
+plt.show()
+
+plt.figure(5)
+plt.hist([embedding_1_max, embedding_2_max, embedding_p_t_max, embedding_b_n_max], bins=50, range=(0,7), density=True)
+plt.legend(["Wearer", "Other human voice", "Other virtual voice", "Background"])
 plt.xlabel('Max embedding values')
 plt.ylabel('Density')
 plt.show()
@@ -250,7 +281,7 @@ test_labels_filtered[idx_other_voice] = 2
 idx_other_voice = np.where(test_labels_filtered == 'p')
 test_labels_filtered[idx_other_voice] = 2
 idx_other_voice = np.where(test_labels_filtered == 't')
-test_labels_filtered[idx_other_voice] = 2
+test_labels_filtered[idx_other_voice] = 0
 idx_noise = np.where(test_labels_filtered == 'b')   # non-vocal background
 idx_noise_old = np.where(test_labels_filtered == 0)   # old labels of noise
 if classes == 3:
@@ -263,11 +294,14 @@ test_labels_filtered = test_labels_filtered.astype(int)
 #%%
 if feat_type == 'embedding':
     if classes == 2:
-        threshold = 0.311
+        threshold = 0.2276   # P0: 0.3222; P2: 0.1545
     elif classes == 3:
-        threshold = [0.3221, 0.2905]
+        threshold = [0.2458, 0.1213]   # P0: [0.3221, 0.2905]; P2: [0.1725, 0.1030]
 elif feat_type == 'mfcc':
-    threshold = [0.99743, 0.99380]
+    if classes == 2:
+        threshold = 0.9888   # P5: 0.9888 
+    elif classes == 3:
+        threshold = [0.9922, 0.9819] # P5: [0.9922, 0.9819] 
     
 # fit and predict
 if classes == 2:  
@@ -275,9 +309,10 @@ if classes == 2:
                                                 threshold = threshold)   
 elif classes == 3:
     clf = distance_based_classifier_three_class(distance_metric = 'cosine_similarity', 
-                                                threshold = threshold)
-clf.fit(train_vec_ws)
-pred_labels = clf.predict(test_embedding_filtered)
+                                                threshold = threshold,
+                                                feat_type = feat_type)
+clf.fit(train_vec_ws[:, :])
+pred_labels = clf.predict(test_embedding_filtered[:,:])
 acc = balanced_accuracy_score(test_labels_filtered, pred_labels)
 f1 = f1_score(test_labels_filtered, pred_labels, average = 'macro')
 
@@ -289,7 +324,7 @@ elif classes == 3:
     print('Using threshold %.4f, %.4f: balanced accuracy %f macro f1 %f' %(threshold[0], 
                                                                               threshold[1], 
                                                                               acc, f1))
-plt.figure(5, figsize = (6,4))
+plt.figure(6, figsize = (6,4))
 a = confusion_matrix(test_labels_filtered, pred_labels)
 
 if classes == 2:
@@ -317,7 +352,7 @@ if classes == 3:
     dis_ns = clf.compute_distance(vec_ns)
 
 
-plt.figure(6)
+plt.figure(7)
 if classes == 2:
     plt.hist([dis_ws, dis_os], bins=50, density  = True)
     plt.legend(["Wearer", "Background + Other voice"])
@@ -330,3 +365,4 @@ elif classes == 3:
     plt.xlabel('Cosine similarity')
     plt.ylabel('Density')
     plt.show()   
+    
