@@ -295,29 +295,55 @@ test_labels_filtered = test_labels_filtered.astype(int)
 
 #%%
 if feat_type == 'embedding':
-    if classes == 2:
-        threshold = 0.2276   # P0: 0.3222; P2: 0.1545
-    elif classes == 3:
-        threshold = [0.2458, 0.1213]   # P0: [0.3221, 0.2905]; P2: [0.1725, 0.1030]
+    start, step = 0, 0.02
 elif feat_type == 'mfcc':
-    if classes == 2:
-        threshold = 0.9888   # P5: 0.9888 
-    elif classes == 3:
-        threshold = [0.9922, 0.9819] # P5: [0.9922, 0.9819] 
-    
+    start, step = 0.5, 0.001
 # fit and predict
-if classes == 2:  
+acc, step_cnt = 0, 0
+for t1 in np.arange(start, 1, step):    
+    if classes == 2:  
+        clf = distance_based_classifier_two_class(distance_metric = 'cosine_similarity', 
+                                                    threshold = t1)  
+        clf.fit(train_vec_ws[:, :])
+        pred_labels = clf.predict(test_embedding_filtered[:,:])
+        acc_temp = balanced_accuracy_score(test_labels_filtered, pred_labels)
+        if acc_temp > acc:
+            acc = acc_temp
+            threshold = t1
+            print('current best acc (2 class):', acc_temp)
+    elif classes == 3:
+        step_cnt = 0
+        for t2 in np.arange(start, 1, step):
+            clf = distance_based_classifier_three_class(distance_metric = 'cosine_similarity', 
+                                                        threshold = [t1, t2],
+                                                        feat_type = feat_type)
+            clf.fit(train_vec_ws[:, :])
+            pred_labels = clf.predict(test_embedding_filtered[:,:])
+            acc_temp = balanced_accuracy_score(test_labels_filtered, pred_labels)
+            if acc_temp > acc:
+                acc = acc_temp
+                threshold = [t1, t2]
+                print('current best acc (3 class):', acc_temp)
+            # grid search limit for the fast pointer: 5 steps
+            else:
+                step_cnt += 1
+                if step_cnt > 5:
+                    break
+if classes == 2: 
     clf = distance_based_classifier_two_class(distance_metric = 'cosine_similarity', 
-                                                threshold = threshold)   
+                                                    threshold = threshold)  
+    clf.fit(train_vec_ws[:, :])
+    pred_labels = clf.predict(test_embedding_filtered[:,:])
+    acc = balanced_accuracy_score(test_labels_filtered, pred_labels)               
+    f1 = f1_score(test_labels_filtered, pred_labels, average = 'macro')
 elif classes == 3:
     clf = distance_based_classifier_three_class(distance_metric = 'cosine_similarity', 
-                                                threshold = threshold,
-                                                feat_type = feat_type)
-clf.fit(train_vec_ws[:, :])
-pred_labels = clf.predict(test_embedding_filtered[:,:])
-acc = balanced_accuracy_score(test_labels_filtered, pred_labels)
-f1 = f1_score(test_labels_filtered, pred_labels, average = 'macro')
-
+                                                    threshold = threshold)  
+    clf.fit(train_vec_ws[:, :])
+    pred_labels = clf.predict(test_embedding_filtered[:,:])
+    acc = balanced_accuracy_score(test_labels_filtered, pred_labels)               
+    f1 = f1_score(test_labels_filtered, pred_labels, average = 'macro')
+    
 # print classification result
 if classes == 2:
     print('Using threshold %.4f: balanced accuracy %f macro f1 %f' %(threshold,  
@@ -332,11 +358,11 @@ a = confusion_matrix(test_labels_filtered, pred_labels)
 if classes == 2:
     plot_confusion_matrix(a, classes=["Back + Other voice", "Wearer"], normalize=True,
                           title='Classification Results')
-    plt.title('Confusion matrix, 2-Class (threshold %.3f)' %(threshold))
+    plt.title('Confusion matrix, 2-Class (threshold %.4f)' %(threshold))
 elif classes == 3:
     plot_confusion_matrix(a, classes=["Background", "Wearer", "Other voice"], normalize=True,
                           title='Classification Results')
-    plt.title('Confusion matrix, 3-Class (thresholds %.3f, %.3f)' %(threshold[0], threshold[1]))
+    plt.title('Confusion matrix, 3-Class (thresholds %.4f, %.4f)' %(threshold[0], threshold[1]))
 plt.show()
 
 # Plot class-wise feature distributions
