@@ -200,7 +200,9 @@ train_vec_ws = train_embedding[idx_valid_voice]
 # remove invalid test sounds
 idx_valid_voice_m = np.where(test_labels != 'm')
 idx_valid_voice_x = np.where(test_labels != 'x')
+idx_valid_voice_c = np.where(test_labels != 'c')
 idx_valid_voice = np.intersect1d(idx_valid_voice_m, idx_valid_voice_x)
+idx_valid_voice = np.intersect1d(idx_valid_voice, idx_valid_voice_c)
 test_labels_filtered = test_labels[idx_valid_voice]
 test_embedding_filtered = test_embedding[idx_valid_voice]
 
