@@ -11,10 +11,10 @@ import numpy as np
 import audio_utils.audio_io as io
 import check_dirs
 
-target_file = 'outdoor'
-audio_path = './field_study/field_data/p0/segments/%s.wav' % target_file # path to load the audio clip
-label_path = './field_study/field_data/p0/labels/%s.csv' % target_file # path to load the csv labels
-save_validation_audio = './field_study/field_data/p0/validation_audio/%s/' % target_file # path to save your segmentation
+target_file = 'TV'
+audio_path = './field_study/field_data/P7/segments/%s.wav' % target_file # path to load the audio clip
+label_path = './field_study/field_data/P7/labels/%s.csv' % target_file # path to load the csv labels
+save_validation_audio = './field_study/field_data/P7/validation_audio/%s/' % target_file # path to save your segmentation
 
 #%%
 # Load wav data
@@ -24,7 +24,8 @@ seg_dict = {'wearer': np.empty((0,0)),
             'others': np.empty((0,0)),
             'phone': np.empty((0,0)), 
             'tv':np.empty((0,0)), 
-            'back':np.empty((0,0))} 
+            'back':np.empty((0,0)),
+            'mixed':np.empty((0,0))} 
 labels = pd.read_csv(label_path, header=None).values
 for i in range(len(labels)):
     if labels[i,:] == '1':
@@ -37,6 +38,8 @@ for i in range(len(labels)):
         seg_dict['tv'] = np.append(seg_dict['tv'], y[i*16000:(i+1)*16000])
     elif labels[i,:] == 'b':
         seg_dict['back'] = np.append(seg_dict['back'], y[i*16000:(i+1)*16000]) 
+    elif labels[i,:] == 'm':
+        seg_dict['mixed'] = np.append(seg_dict['mixed'], y[i*16000:(i+1)*16000])
 check_dirs.check_dir(save_validation_audio)
 for seg in seg_dict.keys():
     if len(seg_dict[seg]) > 0:
